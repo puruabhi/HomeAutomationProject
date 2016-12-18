@@ -12,37 +12,51 @@ import android.content.IntentFilter;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Message;
+import android.text.Layout;
 import android.view.View;
 
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 
 import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.UUID;
+import android.os.Handler;
+import java.util.logging.LogRecord;
 
 import android.support.v7.app.AppCompatActivity;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends Activity {
 
+    LinearLayout ledOnOff;
     ListView listView;
     private BluetoothAdapter BA;
     private Set<BluetoothDevice> pairedDevices;
-    public TextView pairedDevicesTextView;
-    public Button turnOnButton;
-    public Button turnOffButton;
+    public TextView pairedDevicesTextView,bluetooth_textView;
+    public Button turnOnButton,onButton;
+    public Button turnOffButton,offButton;
     public Button searchDevicesButton;
     public Button pairedDevicesButton;
     private ArrayList listSearch;
     ConnectThread mConnectThread;
     private BluetoothDevice mDevice;
+    private BluetoothSocket mSocket;
+    ConnectedThread mConnectedThread;
+    Handler mHandler;
+    private StringBuilder recDataString = new StringBuilder();
+    final int handlerState = 0;
+    public String status;
+    UUID uuid = UUID.fromString("00001101-0000-1000-8000-00805f9b34fb"); //Standard SerialPortService ID
 
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
         public void onReceive(Context context, Intent intent) {
@@ -79,9 +93,16 @@ public class MainActivity extends AppCompatActivity {
             }
             else if(BluetoothDevice.ACTION_ACL_CONNECTED.equals(action))
             {
-                //Toast.makeText(getApplicationContext(),"Connected",Toast.LENGTH_SHORT);
+                showLedButtons();
+                Toast.makeText(getApplicationContext(),"Connected",Toast.LENGTH_SHORT).show();
+                //setContentView(R.layout.connected);
+                //setBluetoothSocket();
             }
             else if(BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action));
+            {
+                removeLedButtons();
+                //setContentView(R.layout.activity_main);
+            }
         }
     };
 
@@ -90,6 +111,35 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         registerReceiverIntent();
         setupUI();
+        mHandler = new Handler() {
+            @Override
+            public void handleMessage(Message msg) {
+                byte[] writeBuf = (byte[]) msg.obj;
+                int begin = (int)msg.arg1;
+                int end = (int)msg.arg2;
+                switch(msg.what) {
+                    case 1:
+                        String writeMessage = new String(writeBuf);
+                        writeMessage = writeMessage.substring(begin, end);
+                        status = writeMessage;
+                        break;
+                }
+            }
+        };
+    }
+
+    public void showLedButtons()
+    {
+        //listView.setVisibility(View.GONE);
+        //pairedDevicesTextView.setVisibility(View.GONE);
+        //ledOnOff.setVisibility(View.VISIBLE);
+    }
+
+    public void removeLedButtons()
+    {
+        //listView.setVisibility(View.VISIBLE);
+        //pairedDevicesTextView.setVisibility(View.VISIBLE);
+        //ledOnOff.setVisibility(View.GONE);
     }
 
     private void setupUI()
@@ -97,11 +147,16 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         BA = BluetoothAdapter.getDefaultAdapter();
         listView = (ListView) findViewById(R.id.listView);
+        ledOnOff = (LinearLayout) findViewById(R.id.ledOnOff);
+        onButton = (Button) findViewById(R.id.onButton);
+        offButton = (Button)findViewById(R.id.offButton);
         pairedDevicesTextView = (TextView)findViewById(R.id.pairedDevicesTextView);
         turnOnButton = (Button)findViewById(R.id.turnOnButton);
         turnOffButton = (Button)findViewById(R.id.turnOffButton);
         searchDevicesButton = (Button)findViewById(R.id.searchDeviceButton);
         pairedDevicesButton = (Button)findViewById(R.id.pairedDevicesButton);
+        bluetooth_textView = (TextView) findViewById(R.id.bluetooth_textView);
+        //ledOnOff.setVisibility(View.GONE);
         setInitialLayout();
         if(BA==null)
         {
@@ -213,6 +268,14 @@ public class MainActivity extends AppCompatActivity {
         BA.cancelDiscovery();
     }
 
+    /*public void setBluetoothSocket()
+    {
+        try{
+            mmInputStream = mSocket.getInputStream();
+            mmOutputStream = mSocket.getOutputStream();
+        }catch (Exception e){Toast.makeText(getApplicationContext(),"Error",Toast.LENGTH_SHORT).show();}
+    }*/
+
     public void registerReceiverIntent()
     {
         IntentFilter filter = new IntentFilter();
@@ -224,6 +287,20 @@ public class MainActivity extends AppCompatActivity {
         filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
 
         registerReceiver(mReceiver, filter);
+    }
+
+    public void ledOn(View view)
+    {
+        String out = "1";
+        byte[] outb = out.getBytes();
+        mConnectedThread.write(out.getBytes());
+        Toast.makeText(getApplicationContext(),"On",Toast.LENGTH_SHORT).show();
+    }
+
+    public void ledOff(View view)
+    {
+        String out = "0";
+        mConnectedThread.write(out.getBytes());
     }
 
     public void searchNearbyDevices(View view)
@@ -243,7 +320,6 @@ public class MainActivity extends AppCompatActivity {
             BA.cancelDiscovery();
             searchDevicesButton.setText("search devices");
         }
-
     }
 
     private class ConnectThread extends Thread {
@@ -257,11 +333,14 @@ public class MainActivity extends AppCompatActivity {
                 tmp = device.createRfcommSocketToServiceRecord(MY_UUID);
             } catch (IOException e) { }
             mmSocket = tmp;
+            //mSocket = mmSocket;
         }
         public void run() {
             BA.cancelDiscovery();
             try {
                 mmSocket.connect();
+                mConnectedThread = new ConnectedThread(mmSocket);
+                mConnectedThread.start();
             } catch (IOException connectException) {
                 try {
                     mmSocket.close();
@@ -269,10 +348,62 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
         }
-        /*public void cancel() {
+
+        public void cancel() {
             try {
                 mmSocket.close();
             } catch (IOException e) { }
-        }*/
+        }
+    }
+
+    private class ConnectedThread extends Thread {
+        private final BluetoothSocket mmSocket;
+        private final InputStream mmInStream;
+        private final OutputStream mmOutStream;
+        public ConnectedThread(BluetoothSocket socket) {
+            mmSocket = socket;
+            InputStream tmpIn = null;
+            OutputStream tmpOut = null;
+            try {
+                tmpIn = socket.getInputStream();
+                tmpOut = socket.getOutputStream();
+            } catch (IOException e) { }
+            mmInStream = tmpIn;
+            mmOutStream = tmpOut;
+        }
+        public void run() {
+            byte[] buffer = new byte[1024];
+            int begin = 0;
+            int bytes = 0;
+            while (true) {
+                try {
+                    bytes += mmInStream.read(buffer, bytes, buffer.length - bytes);
+                    for(int i = begin; i < bytes; i++) {
+                        if(buffer[i] == "#".getBytes()[0]) {
+                            mHandler.obtainMessage(1, begin, i, buffer).sendToTarget();
+                            begin = i + 1;
+                            if(i == bytes - 1) {
+                                bytes = 0;
+                                begin = 0;
+                            }
+                        }
+                    }
+
+                } catch (IOException e) {
+                    break;
+                }
+            }
+        }
+        public void write(byte[] bytes) {
+            try {
+                Toast.makeText(getApplicationContext(),"thread",Toast.LENGTH_SHORT).show();
+                mmOutStream.write(bytes);
+            } catch (IOException e) { }
+        }
+        public void cancel() {
+            try {
+                mmSocket.close();
+            } catch (IOException e) { }
+        }
     }
 }

@@ -47,15 +47,56 @@
 
     </RelativeLayout>
 
+    <TextView
+        android:id="@+id/pairedDevicesTextView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/paired_searchButtons"
+        android:text="Paired Devices:"
+        android:textSize="20dp"
+        />
+
     <LinearLayout
-        android:layout_below="@id/RelativeLayoutOnOff"
+        android:id="@+id/ledOnOff"
+        android:orientation="horizontal"
+        android:layout_alignParentBottom="true"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <Button
+            android:id="@+id/onButton"
+            android:text="LED On"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:onClick="ledOn"
+            android:layout_weight="1"/>
+
+        <Button
+            android:id="@+id/offButton"
+            android:text="LED Off"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:onClick="ledOff"
+            android:layout_weight="1"/>
+    </LinearLayout>
+
+    <ListView
+        android:id="@+id/listView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/ledOnOff"
+        android:layout_below="@id/pairedDevicesTextView"
+        >
+    </ListView>
+
+    <LinearLayout
         android:id="@+id/paired_searchButtons"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_alignRight="@id/RelativeLayoutOnOff"
-        android:layout_alignLeft="@id/RelativeLayoutOnOff"
-        >
+        android:layout_below="@+id/RelativeLayoutOnOff"
+        android:layout_alignLeft="@+id/RelativeLayoutOnOff"
+        android:layout_alignStart="@+id/RelativeLayoutOnOff">
 
         <Button
             android:id="@+id/pairedDevicesButton"
@@ -76,23 +117,5 @@
             />
 
     </LinearLayout>
-
-    <TextView
-        android:id="@+id/pairedDevicesTextView"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/paired_searchButtons"
-        android:text="Paired Devices:"
-        android:textSize="20dp"
-        />
-    
-    <ListView
-        android:id="@+id/listView"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:layout_below="@id/pairedDevicesTextView"
-        >
-    </ListView>
 
 </RelativeLayout>
